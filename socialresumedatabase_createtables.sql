@@ -1,0 +1,553 @@
+CREATE SCHEMA SOCIAL_RESUME_DATABASE;
+USE SOCIAL_RESUME_DATABASE;
+
+CREATE TABLE IF NOT EXISTS COUNTRY(
+	country_id MEDIUMINT(8) NOT NULL AUTO_INCREMENT,
+    country_name VARCHAR(45) DEFAULT NULL,
+    PRIMARY KEY(country_id)
+);
+
+CREATE TABLE IF NOT EXISTS CITY(
+	city_id MEDIUMINT(8) NOT NULL AUTO_INCREMENT,
+	city_name VARCHAR(45) DEFAULT NULL,
+    country_id MEDIUMINT(8) NOT NULL,
+	PRIMARY KEY(city_id),
+    FOREIGN KEY(country_id) REFERENCES COUNTRY (country_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS ORGANIZATIONS(
+	org_id MEDIUMINT(8) NOT NULL AUTO_INCREMENT,
+    org_name VARCHAR(45) DEFAULT NULL,
+    org_description VARCHAR(255) DEFAULT NULL,
+    other VARCHAR(255) DEFAULT NULL,
+    PRIMARY KEY(org_id)
+);
+
+CREATE TABLE IF NOT EXISTS MEMBERS(
+	member_id MEDIUMINT(8) NOT NULL DEFAULT '0',
+    e_mail VARCHAR(100) DEFAULT NULL,
+    password_ VARCHAR(45) DEFAULT NULL,
+    fname VARCHAR(45) DEFAULT NULL,
+    minit VARCHAR(45) DEFAULT NULL,
+    lname VARCHAR(45) DEFAULT NULL,
+    gender ENUM('Male','Female') DEFAULT NULL,
+    marital_status ENUM('Single','in Relationship','Married','Separated') DEFAULT NULL,
+	profile_picture VARCHAR(255) DEFAULT NULL,
+	current_organization_id MEDIUMINT(8) NOT NULL,
+    join_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    other VARCHAR(255) DEFAULT NULL,
+    work_comp_id MEDIUMINT(8) DEFAULT NULL,
+    PRIMARY KEY (member_id),   
+    FOREIGN KEY (current_organization_id) REFERENCES ORGANIZATIONS (org_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS PROFILE_(
+	profile_id MEDIUMINT(8) NOT NULL UNIQUE,
+    numberOfFriends tinyint(3) NOT NULL DEFAULT '0',
+    phone_number VARCHAR(45) DEFAULT NULL,
+	birthday DATE DEFAULT NULL,    
+    about_me VARCHAR(255) DEFAULT NULL,
+    interests VARCHAR(255) DEFAULT NULL,
+    religion VARCHAR(255) DEFAULT NULL,
+    hobbies VARCHAR(255) DEFAULT NULL,
+    fav_movies VARCHAR(255) DEFAULT NULL,
+    fav_artists VARCHAR(255) DEFAULT NULL,
+    fav_books VARCHAR(255) DEFAULT NULL,
+    fav_animals VARCHAR(255) DEFAULT NULL,
+    everything_else VARCHAR(255) DEFAULT NULL,    
+    date_created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    date_updated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+	member_id MEDIUMINT(8),
+    PRIMARY KEY(profile_id, member_id),
+    FOREIGN KEY (member_id) REFERENCES MEMBERS (member_id) ON DELETE CASCADE ON UPDATE CASCADE
+);    
+
+CREATE TABLE IF NOT EXISTS ADDRESS(
+	address_id MEDIUMINT(8) NOT NULL AUTO_INCREMENT,
+    address VARCHAR(255) DEFAULT NULL,
+    member_id MEDIUMINT(8) DEFAULT NULL,
+    city_id MEDIUMINT(8) DEFAULT NULL,
+    PRIMARY KEY(address_id),
+    FOREIGN KEY (city_id) REFERENCES CITY (city_id),
+ 	FOREIGN KEY(member_id) REFERENCES MEMBERS(member_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS COMPANY (
+	company_id MEDIUMINT(8) NOT NULL AUTO_INCREMENT,
+    cname	VARCHAR(45) NOT NULL,
+	sector VARCHAR(45) DEFAULT NULL,
+    size VARCHAR(45) DEFAULT NULL,
+    ctype VARCHAR(45) DEFAULT NULL,
+    cdesc VARCHAR(45) DEFAULT NULL,
+    logo VARCHAR(45) DEFAULT NULL,
+    address_id  MEDIUMINT(8) DEFAULT NULL,
+    boss MEDIUMINT(8) DEFAULT NULL,
+    PRIMARY KEY (company_id),
+    FOREIGN KEY (address_id) REFERENCES ADDRESS (address_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (boss) REFERENCES MEMBERS (member_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+ALTER TABLE MEMBERS
+	ADD CONSTRAINT members_ibfk_2 FOREIGN KEY (work_comp_id) REFERENCES COMPANY (company_id) ON DELETE CASCADE ON UPDATE CASCADE;
+
+CREATE TABLE IF NOT EXISTS JOB_OFFER (
+	job_id MEDIUMINT(8) NOT NULL AUTO_INCREMENT,
+    job_title VARCHAR(45) DEFAULT NULL,
+    location VARCHAR(45) DEFAULT NULL,
+    job_function VARCHAR(255) DEFAULT NULL,
+    emplooye_type VARCHAR(45) DEFAULT NULL,
+    seniority VARCHAR(45) DEFAULT NULL,
+    offer_desc VARCHAR(45) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    company_id MEDIUMINT(8) NOT NULL,
+    PRIMARY KEY (job_id),
+    FOREIGN KEY (company_id) REFERENCES COMPANY(company_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS FOLLOWS_ (
+	member_id MEDIUMINT(8) NOT NULL,
+    company_id MEDIUMINT(8) NOT NULL,
+    PRIMARY KEY (member_id, company_id),
+    FOREIGN KEY (member_id) REFERENCES MEMBERS (member_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (company_id) REFERENCES COMPANY (company_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS NICKNAME (
+	nickname_id MEDIUMINT(8) NOT NULL AUTO_INCREMENT,
+    nickname VARCHAR(45) NOT NULL,
+    member_id MEDIUMINT(8) NOT NULL UNIQUE,
+    PRIMARY KEY(nickname_id, member_id),
+    FOREIGN KEY (member_id) REFERENCES MEMBERS (member_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS FRIEND (
+	member_id MEDIUMINT(8) NOT NULL,
+    friend_member_id MEDIUMINT(8) NOT NULL,
+    is_subscriber BOOLEAN DEFAULT '0',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,    
+    PRIMARY KEY(member_id, friend_member_id),
+    FOREIGN KEY (friend_member_id) REFERENCES MEMBERS (member_id) ON DELETE CASCADE ON UPDATE CASCADE,
+	FOREIGN KEY (member_id) REFERENCES MEMBERS (member_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+DELIMITER //
+CREATE TRIGGER selfrequest BEFORE INSERT ON FRIEND
+ FOR EACH ROW BEGIN
+          IF NEW.member_id=New.friend_member_id 
+          THEN
+               SIGNAL SQLSTATE '45000'
+                    SET MESSAGE_TEXT = 'Cannot be friend yourself';
+          END IF;
+     END
+//
+DELIMITER ;
+
+DELIMITER //
+CREATE TRIGGER selfrequest2 BEFORE UPDATE ON FRIEND
+ FOR EACH ROW BEGIN
+          IF NEW.member_id=New.friend_member_id 
+          THEN
+               SIGNAL SQLSTATE '45000'
+                    SET MESSAGE_TEXT = 'Cannot be friend yourself';
+          END IF;
+     END
+//
+DELIMITER ;
+
+DELIMITER //
+CREATE TRIGGER arkadasmi BEFORE INSERT ON FRIEND
+ FOR EACH ROW BEGIN
+          IF EXISTS(SELECT friend_member_id 
+					FROM FRIEND
+                    WHERE member_id=new.friend_member_id AND friend_member_id=new.member_id)
+          THEN
+               SIGNAL SQLSTATE '45000'
+                    SET MESSAGE_TEXT = 'You are already friends';
+          END IF;
+     END
+//
+DELIMITER ;
+
+DELIMITER //
+CREATE TRIGGER arkadasmi2 BEFORE UPDATE ON FRIEND
+ FOR EACH ROW BEGIN
+          IF EXISTS(SELECT friend_user_id 
+					FROM FRIEND
+                    WHERE user_id=new.friend_user_id AND friend_user_id=new.user_id)
+          THEN
+               SIGNAL SQLSTATE '45000'
+                    SET MESSAGE_TEXT = 'You are already friends';
+          END IF;
+     END
+//
+DELIMITER ;
+
+
+DELIMITER //
+CREATE TRIGGER FRIEND_NUMBER_INCREMENT BEFORE INSERT ON Friend
+ FOR EACH ROW BEGIN
+	UPDATE Profile_ SET Profile_.numberOfFriends = Profile_.numberOfFriends +1 
+    WHERE Profile_.member_id =(select NEW.friend_member_id );
+	UPDATE Profile_ SET Profile_.numberOfFriends = numberOfFriends +1  WHERE Profile_.member_id =NEW.member_id;
+ END
+
+//
+DELIMITER ;
+DELIMITER //
+CREATE TRIGGER FRIEND_NUMBER_DECREMENT BEFORE DELETE ON Friend
+ FOR EACH ROW BEGIN
+	UPDATE Profile_ SET Profile_.numberOfFriends = Profile_.numberOfFriends -1 
+    WHERE Profile_.member_id =(select OLD.friend_member_id );
+	UPDATE Profile_ SET Profile_.numberOfFriends = numberOfFriends -1  WHERE Profile_.member_id =OLD.member_id;
+     END
+//
+DELIMITER ;
+
+
+CREATE TABLE IF NOT EXISTS GROUPS_(
+	group_id MEDIUMINT(8) NOT NULL AUTO_INCREMENT,
+    group_name VARCHAR(45) DEFAULT NULL,
+    group_description VARCHAR(255) DEFAULT NULL,
+    group_start TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    group_end TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    group_last_activity TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    other VARCHAR(255) DEFAULT NULL,
+    create_member_id MEDIUMINT(8) DEFAULT NULL,
+    PRIMARY KEY(group_id),
+    FOREIGN KEY (create_member_id) REFERENCES MEMBERS (member_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+DELIMITER //
+CREATE TRIGGER groupdatecontrol BEFORE INSERT ON GROUPS_
+ FOR EACH ROW BEGIN
+          IF New.group_start>New.group_end
+			THEN
+               SIGNAL SQLSTATE '45000'
+                    SET MESSAGE_TEXT = 'Can not start date bigger than end date';
+          END IF;
+     END
+//
+DELIMITER ;
+
+DELIMITER //
+CREATE TRIGGER groupdatecontrol2 BEFORE UPDATE ON GROUPS_
+ FOR EACH ROW BEGIN
+          IF New.group_start>New.group_end
+			THEN
+               SIGNAL SQLSTATE '45000'
+                    SET MESSAGE_TEXT = 'Can not start date bigger than end date';
+          END IF;
+     END
+//
+DELIMITER ;
+
+
+CREATE TABLE IF NOT EXISTS EVENTS_ (
+	event_id MEDIUMINT(8) NOT NULL AUTO_INCREMENT,
+    event_name VARCHAR(45) DEFAULT NULL,
+    event_description VARCHAR(255) DEFAULT NULL,
+    event_start TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    event_end TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    event_address_id MEDIUMINT(8) DEFAULT NULL,
+    other VARCHAR(255) DEFAULT NULL,
+    create_member_id MEDIUMINT(8) DEFAULT NULL, 
+    PRIMARY KEY (event_id),
+    FOREIGN KEY (event_address_id) REFERENCES ADDRESS (address_id),
+    FOREIGN KEY (create_member_id) REFERENCES MEMBERS (member_id) ON DELETE CASCADE ON UPDATE CASCADE
+);  
+
+DELIMITER //
+CREATE TRIGGER eventdatecontrol BEFORE INSERT ON EVENTS_
+ FOR EACH ROW BEGIN
+          IF New.event_start>New.event_end
+			THEN
+               SIGNAL SQLSTATE '45000'
+                    SET MESSAGE_TEXT = 'Can not start date bigger than end date';
+          END IF;
+     END
+//
+DELIMITER ;
+
+DELIMITER //
+CREATE TRIGGER eventdatecontrol2 BEFORE UPDATE ON EVENTS_
+ FOR EACH ROW BEGIN
+          IF New.event_start>New.event_end
+			THEN
+               SIGNAL SQLSTATE '45000'
+                    SET MESSAGE_TEXT = 'Can not start date bigger than end date';
+          END IF;
+     END
+//
+DELIMITER ;
+
+CREATE TABLE IF NOT EXISTS PAGES (
+	page_id MEDIUMINT(8) NOT NULL AUTO_INCREMENT,
+    page_name VARCHAR(45) DEFAULT NULL,
+    page_description VARCHAR(255) DEFAULT NULL,
+    other VARCHAR(255) DEFAULT NULL,
+    create_member_id MEDIUMINT(8) DEFAULT NULL, 
+    PRIMARY KEY (page_id),
+    FOREIGN KEY (create_member_id) REFERENCES MEMBERS (member_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+    
+CREATE TABLE IF NOT EXISTS CV(
+	cv_id MEDIUMINT(8) NOT NULL AUTO_INCREMENT,
+    date_created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    date_updated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    member_id MEDIUMINT(8) NOT NULL,
+    PRIMARY KEY(cv_id, member_id),
+    FOREIGN KEY (member_id) REFERENCES MEMBERS (member_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+    
+CREATE TABLE IF NOT EXISTS CV_SECTION(
+	cv_section_id MEDIUMINT(8) NOT NULL AUTO_INCREMENT,
+    title ENUM('Work Experience','Education','Licance and Sertificated','Volunteer Experience') DEFAULT NULL,
+    description_ VARCHAR(255) DEFAULT NULL,
+    date_created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    date_updated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    cv_id MEDIUMINT(8) NOT NULL,
+    PRIMARY KEY(cv_section_id),
+    FOREIGN KEY (cv_id) REFERENCES CV (cv_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS PROFILE_SECTION(
+	profile_section_id MEDIUMINT(8) NOT NULL AUTO_INCREMENT,
+    title ENUM('Skills','Patent','Course','Project','Honors and Awards','Exam Scores','Languages','Organizations'),
+    text_ VARCHAR(255) DEFAULT NULL,
+    date_created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    date_updated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    profile_id MEDIUMINT(8),
+    PRIMARY KEY(profile_section_id),
+    FOREIGN KEY (profile_id) REFERENCES PROFILE_ (profile_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+    
+CREATE TABLE IF NOT EXISTS CONNECTS(
+	member_id MEDIUMINT(8) NOT NULL,
+    connected_member_id  MEDIUMINT(8) NOT NULL,
+    connection_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY(member_id,connected_member_id),
+    FOREIGN KEY (member_id) REFERENCES MEMBERS (member_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (connected_member_id) REFERENCES MEMBERS (member_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+DELIMITER //
+CREATE TRIGGER insert_selfconnects BEFORE INSERT ON CONNECTS
+ FOR EACH ROW BEGIN
+          IF NEW.member_id=New.connected_member_id 
+          THEN
+               SIGNAL SQLSTATE '45000'
+                    SET MESSAGE_TEXT = 'Can not connect with yourself!';
+          END IF;
+     END
+//
+DELIMITER ;
+DELIMITER //
+CREATE TRIGGER update_connects BEFORE UPDATE ON CONNECTS
+ FOR EACH ROW BEGIN
+          IF NEW.member_id=New.connected_member_id 
+          THEN
+               SIGNAL SQLSTATE '45000'
+                    SET MESSAGE_TEXT = 'Can not connect with yourself!';
+          END IF;
+     END
+//
+DELIMITER ;
+
+CREATE TABLE IF NOT EXISTS RECOMMENDATION(
+	member_id MEDIUMINT(8) NOT NULL,
+    recommended_id MEDIUMINT(8) NOT NULL,
+    start_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    others_ VARCHAR(255) DEFAULT NULL,
+    PRIMARY KEY(member_id,recommended_id),
+	FOREIGN KEY (member_id) REFERENCES MEMBERS (member_id) ON DELETE CASCADE ON UPDATE CASCADE,
+	FOREIGN KEY (recommended_id) REFERENCES MEMBERS (member_id) ON DELETE CASCADE ON UPDATE CASCADE
+);  
+
+DELIMITER //
+CREATE TRIGGER insert_selfrec BEFORE INSERT ON RECOMMENDATION
+ FOR EACH ROW BEGIN
+          IF NEW.member_id=New.recommended_id 
+          THEN
+               SIGNAL SQLSTATE '45000'
+                    SET MESSAGE_TEXT = 'Can not recommend yourself!';
+          END IF;
+     END
+//
+DELIMITER ;
+DELIMITER //
+CREATE TRIGGER update_selfrec BEFORE UPDATE ON RECOMMENDATION
+ FOR EACH ROW BEGIN
+          IF NEW.member_id=New.recommended_id 
+          THEN
+               SIGNAL SQLSTATE '45000'
+                    SET MESSAGE_TEXT = 'Can not recommend yourself!';
+          END IF;
+     END
+//
+DELIMITER ;
+    
+
+CREATE TABLE IF NOT EXISTS BCATEGORY (
+	bookmark_category_id SMALLINT(5) NOT NULL AUTO_INCREMENT,
+    bname VARCHAR(45) DEFAULT NULL,
+    PRIMARY KEY(bookmark_category_id)
+);
+
+CREATE TABLE IF NOT EXISTS BOOKMARK (
+	bookmark_id BIGINT(20) NOT NULL AUTO_INCREMENT,
+    url VARCHAR(255) DEFAULT NULL,
+    clicks SMALLINT(5) NOT NULL,
+    rating SMALLINT(5) DEFAULT NULL,
+    favorite BOOLEAN DEFAULT '1',
+    bookmark_category_id SMALLINT(5) DEFAULT NULL,
+    member_id MEDIUMINT(8) NOT NULL,
+    PRIMARY KEY (bookmark_id),
+    FOREIGN KEY (bookmark_category_id) REFERENCES BCATEGORY (bookmark_category_id) ON DELETE CASCADE ON UPDATE CASCADE,
+	FOREIGN KEY (member_id) REFERENCES MEMBERS (member_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS FCATEGORY (
+	feed_category_id SMALLINT(5) NOT NULL AUTO_INCREMENT,
+    fname VARCHAR(45) DEFAULT NULL,
+    PRIMARY KEY(feed_category_id)
+);
+
+CREATE TABLE IF NOT EXISTS FEED (
+	feed_id BIGINT(20) NOT NULL AUTO_INCREMENT,
+    url VARCHAR(255) DEFAULT NULL,
+    clicks SMALLINT(5) NOT NULL,
+    rating SMALLINT(5) DEFAULT NULL,
+    favorite BOOLEAN DEFAULT '1',
+    privacy TINYINT(3) DEFAULT '3',
+    feed_category_id SMALLINT(5) DEFAULT NULL,
+    member_id MEDIUMINT(8) NOT NULL,
+    PRIMARY KEY (feed_id),
+	FOREIGN KEY (feed_category_id) REFERENCES FCATEGORY (feed_category_id) ON DELETE CASCADE ON UPDATE CASCADE,
+	FOREIGN KEY (member_id) REFERENCES MEMBERS (member_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+
+CREATE TABLE IF NOT EXISTS STATUS_ (
+	status_id MEDIUMINT(8) NOT NULL AUTO_INCREMENT,
+    message VARCHAR(255) DEFAULT NULL,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    thumbs_up TINYINT(3) DEFAULT NULL,
+    thumbs_down TINYINT(3) DEFAULT NULL,
+    member_id MEDIUMINT(8) DEFAULT NULL,
+    PRIMARY KEY (status_id),
+	FOREIGN KEY (member_id) REFERENCES MEMBERS (member_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS BLOG (
+	blog_id MEDIUMINT(8) NOT NULL AUTO_INCREMENT,
+    message VARCHAR(255) DEFAULT NULL,
+    author VARCHAR(45) DEFAULT NULL,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+	member_id MEDIUMINT(8) NOT NULL UNIQUE,
+    PRIMARY KEY(blog_id, member_id),
+	FOREIGN KEY (member_id) REFERENCES MEMBERS (member_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS NOTIFICATION (
+	notification_id MEDIUMINT (8) NOT NULL AUTO_INCREMENT,
+    message VARCHAR(255) NOT NULL,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    member_id MEDIUMINT(8) NOT NULL,
+    PRIMARY KEY(notification_id),
+	FOREIGN KEY (member_id) REFERENCES MEMBERS (member_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS MESSAGE(
+	send_member_id MEDIUMINT(8) NOT NULL,
+    to_member_id 	MEDIUMINT(8) NOT NULL,
+    message VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY(send_member_id, to_member_id),
+    FOREIGN KEY (send_member_id) REFERENCES MEMBERS(member_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (to_member_id) REFERENCES MEMBERS(member_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+DELIMITER //
+CREATE TRIGGER before_selfmessage BEFORE INSERT ON Message
+ FOR EACH ROW BEGIN
+          IF NEW.send_member_id=New.to_member_id 
+          THEN
+               SIGNAL SQLSTATE '45000'
+                    SET MESSAGE_TEXT = 'Cannot send message to yourself';
+          END IF;
+     END
+//
+DELIMITER ;
+DELIMITER //
+CREATE TRIGGER update_selfmessage BEFORE UPDATE ON Message
+ FOR EACH ROW BEGIN
+          IF NEW.send_member_id=New.to_member_id 
+          THEN
+               SIGNAL SQLSTATE '45000'
+                    SET MESSAGE_TEXT = 'Cannot send message to yourself';
+          END IF;
+     END
+//
+DELIMITER ;
+
+
+
+CREATE TABLE IF NOT EXISTS COMMENTS (
+	comment_id MEDIUMINT(8) NOT NULL AUTO_INCREMENT,
+    message VARCHAR(255) NOT NULL,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+	status_id MEDIUMINT(8) DEFAULT NULL,
+    friend_member_id MEDIUMINT(8) DEFAULT NULL,
+    member_id MEDIUMINT(8) DEFAULT NULL,
+    PRIMARY KEY (comment_id),
+    FOREIGN KEY (status_id) REFERENCES STATUS_(status_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (friend_member_id) REFERENCES FRIEND (friend_member_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (member_id) REFERENCES MEMBERS(member_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS DEPENDENTS (
+	dep_id MEDIUMINT(8) NOT NULL AUTO_INCREMENT,
+    dep_name VARCHAR(45) DEFAULT NULL,
+    relation VARCHAR(45) DEFAULT NULL,
+    birthday DATE DEFAULT NULL,
+    member_id MEDIUMINT(8) NOT NULL,
+    PRIMARY KEY (dep_id),
+    FOREIGN KEY (member_id) REFERENCES MEMBERS(member_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS LIKES(
+	friend_member_id MEDIUMINT(8) NOT NULL,
+    status_id MEDIUMINT(8) NOT NULL,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY(friend_member_id,status_id),
+    FOREIGN KEY(friend_member_id) REFERENCES FRIEND(friend_member_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY(status_id) REFERENCES STATUS_(status_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS MEMBER_GROUPS(
+	member_id MEDIUMINT(8) NOT NULL,
+    group_id MEDIUMINT(8) NOT NULL,
+    date_joined TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    date_left TIMESTAMP DEFAULT NULL,
+    PRIMARY KEY(member_id,group_id),
+	FOREIGN KEY (member_id) REFERENCES MEMBERS (member_id) ON DELETE CASCADE ON UPDATE CASCADE,
+	FOREIGN KEY (group_id) REFERENCES GROUPS_ (group_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS MEMBER_EVENTS(
+	member_id MEDIUMINT(8) NOT NULL,
+    event_id MEDIUMINT(8) NOT NULL,
+    PRIMARY KEY(member_id,event_id),
+	FOREIGN KEY (member_id) REFERENCES MEMBERS (member_id) ON DELETE CASCADE ON UPDATE CASCADE,
+	FOREIGN KEY (event_id) REFERENCES EVENTS_ (event_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS MEMBER_PAGES(
+	member_id MEDIUMINT(8) NOT NULL,
+    page_id MEDIUMINT(8) NOT NULL,
+    date_joined TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    date_left TIMESTAMP DEFAULT NULL,
+    PRIMARY KEY(member_id,page_id),
+	FOREIGN KEY (member_id) REFERENCES MEMBERS (member_id) ON DELETE CASCADE ON UPDATE CASCADE,
+	FOREIGN KEY (page_id) REFERENCES PAGES (page_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
